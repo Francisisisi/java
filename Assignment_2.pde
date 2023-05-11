@@ -14,25 +14,33 @@ float winDis = dist(rabbitX, rabbitY, 0, 650);
 color rabbitFaceColour = color(255);
 
 //acidRain variables
-int numRain = 15;
+int numAcidRain = 10;
+int numRain = 100;
 float [] rainSpeed = new float[numRain];
 float [] rainSize = new float[numRain];
 float [] xRain = new float[numRain];
 float [] yRain = new float[numRain];
 float [] rainDist = new float[numRain];
+float[] acidX = new float[numAcidRain];
+float[] acidY = new float[numAcidRain];
 color [] rainColour = new color[numRain];
 boolean [] acid = new boolean[numRain];
 
 //Other variables
-int livesCount;
-int scoreCount;
+int livesCount = 3;
+int scoreCount = 0;
 int state = 1;
-boolean runGame;
+int jumpCounter = 0;
+boolean isJumping = false;
+boolean resetFlag = false;
+boolean runGame = true;
 boolean endScreen;
-
+boolean isLost = false;
 
 void setup() {
   size(1200, 700);
+  background(255);
+  noStroke();
   rabbitX = 125;
   rabbitY = 350;
   initialCarrots(numCarrots);
@@ -48,41 +56,93 @@ void setup() {
 
 
 void draw() {
-  if(runGame == true) {
-  drawBackground();
-  rabbitMovement();
-  drawCarrots(carrotX, carrotY);
-  drawRabbit(rabbitX, rabbitY);
-  carrotCollision();
-  drawAcidRain(xRain, yRain, numRain);
-  state = pathwayStates(rabbitX, rabbitY);
-  pathwayChange((dist(rabbitX, rabbitY, width, 350)), (dist(rabbitX, rabbitY, 0, 450)), (dist(rabbitX, rabbitY, width, 550)));
-  }
-  
-  livesScoreText();  
-  winLose();
-  
-}//draw CCB
-
-
-void winLose() {
-  if(livesCount <= 0) {
-    runGame = false; //Disables any background functions
-    endScreen = true; //Enables loseScreen to run
-    if(endScreen == true) {
+  if(runGame) {
+    background(200, 200, 255);
+    drawBackground();
+    carrotCollision();
+    scoreCount++;
+    winLose();
+  } else if(endScreen) {
+    if(isLost) {
       loseScreen();
-    }
-  }
-  winDis = (dist(rabbitX, rabbitY, 0, 650));
-  if(winDis < 15) {
-    runGame = false; //Disables any background functions
-    endScreen = true; //Enables winScreen to run
-    if(endScreen == true) {
+    } else {
       winScreen();
     }
   }
 }
 
+void isLost() {
+  runGame = false;
+}
+
+void keyPressed() {
+  if(resetFlag) {
+    resetFlag = false;
+    setup();
+  }
+  if(key == ' ') {
+    if(isJumping == false) {
+      jumpCounter = 0;
+      isJumping = true;
+    }
+  }
+  if(key == 'r') {
+    resetFlag = true;
+  }
+}
+
+void resetGame() {
+  rabbitX = 50;
+  rabbitY = 350;
+  scoreCount = 0;
+  livesCount = 3;
+}
+
+void winLose() {
+  if(livesCount <= 0) {
+    runGame = false;
+    endScreen = true;
+    isLost = true;
+  }
+}
+  
+void carrotCollision() {
+  // Check for collision with carrots
+  float carrotDist = dist(rabbitX, rabbitY, carrotX, carrotY);
+  if (carrotDist < 20) {
+    scoreCount++;
+    carrotX = random(50, width - 50);
+    carrotY = random(150, height - 50);
+  }
+  
+  // Check for collision with acid rain
+  for (int i = 0; i < numRain; i++) {
+    float acidRainDist = dist(rabbitX, rabbitY, xRain[i], yRain[i]);
+    if (acidRainDist < 20 && acid[i]) {
+      livesCount--;
+      if (livesCount <= 0) {
+        isLost = true;
+        endScreen = true;
+      }
+      xRain[i] = random(0, width);
+      yRain[i] = random(-500, -50);
+      rainSpeed[i] = random(2, 5);
+      rainSize[i] = random(5, 10);
+      rainColour[i] = color(0, 255, 0);  // Set to green (non-acid rain) color
+      acid[i] = false;  // Set to non-acid rain
+      break;
+    } else if (acidRainDist < 20 && !acid[i]) {
+      scoreCount++;
+      xRain[i] = random(0, width);
+      yRain[i] = random(-500, -50);
+      rainSpeed[i] = random(2, 5);
+      rainSize[i] = random(5, 10);
+      rainColour[i] = color(255, 0, 0);  // Set to red (acid rain) color
+      acid[i] = true;  // Set to acid rain
+      break;
+    }
+  }
+}
 
 void initialAcidRain(float[] xRain, float[] yRain, int numRain) { //Populates rain array variables
   for(int i = 0; i < numRain; i++){
@@ -110,7 +170,6 @@ void initialCarrots(int numCarrots) {
 
 
 void drawBackground(){
- noStroke();
  fill(145, 210, 225);//sky
   rect(0, 0, 1200, 300);
  fill(120, 165, 115);
@@ -136,20 +195,31 @@ void drawCarrots(float[] carrotX, float[] carrotY) {
 
 
 void carrotCollision() {
-  for(int i = 0; i < carrotDist.length; i++) {
-  carrotDist[i] = dist(rabbitX, rabbitY, carrotX[i], carrotY[i]);
-    if(carrotDist[i] < 25) {
-      carrotX[i] += 2000;
-      if(carrotValue[i] >= 0) {
-      scoreCount += abs(carrotValue[i]);
-      rabbitFaceColour = color(255, 255, 255);
-      } else if(spicy[i] == true && carrotDist[i] < 25) {
-        livesCount -= 1;
-        rabbitFaceColour = color(255, 0, 0);
+  // Check for collision with carrots
+  for (int i = 0; i < numCarrots; i++) {
+    float carrotDist = dist(rabbitX, rabbitY, carrotX[i], carrotY[i]);
+    if (carrotDist < 20) {
+      scoreCount++;
+      carrotX[i] = random(50, width - 50);
+      carrotY[i] = random(150, height - 50);
+    }
+  }
+  
+  // Check for collision with acid rain
+  for (int i = 0; i < numAcidRain; i++) {
+    float acidDist = dist(rabbitX, rabbitY, acidX[i], acidY[i]);
+    if (acidDist < 20) {
+      livesCount--;
+      if (livesCount <= 0) {
+        isLost = true;
+        endScreen = true;
       }
+      acidX[i] = random(50, width - 50);
+      acidY[i] = random(150, height - 50);
     }
   }
 }
+
   
 
 void rabbitMovement() {
@@ -309,7 +379,6 @@ void winScreen() {
   }
 }
 
-
 void loseScreen() {
   discoScreen();
   fill(0);
@@ -322,10 +391,9 @@ void loseScreen() {
   text("Final score: " + scoreCount, width/2 - 90, height/2);
   text("Lives left was: " + livesCount, width/2 - 105, height/2 + 50);
   text("Press r to restart", width/2 - 110, height/2 + 100);
-  if(keyPressed && key == 'r') {
-    setup();
-  }
 }
+
+
 
   
 void discoScreen() {
